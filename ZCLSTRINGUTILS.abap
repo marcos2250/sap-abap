@@ -46,11 +46,6 @@ public section.
       !VALUE type STRING
     returning
       value(V_OUTPUT) type STRING .
-  methods REMOVESPECIALCHARS
-    importing
-      !V_INPUT type STRING
-    returning
-      value(V_OUTPUT) type STRING .
   methods FORMATANUMERAL
     importing
       !VALUE type P
@@ -80,6 +75,12 @@ public section.
       !END type I
     returning
       value(V_OUTPUT) type STRING .
+  methods JUSTIFY
+    importing
+      !VALUE type STRING
+      !LARG type I
+    returning
+      value(V_OUTPUT) type STRING .      
   methods LASTINDEXOF
     importing
       !VALUE type STRING
@@ -167,9 +168,7 @@ ENDMETHOD.
  METHOD desformataNumc11.
    data: x_input type string, campo type c length 11.
    x_input = input.
-   REPLACE ALL OCCURRENCES OF ',' IN x_input WITH ''.
-   REPLACE ALL OCCURRENCES OF '.' IN x_input WITH ''.
-   REPLACE ALL OCCURRENCES OF '-' IN x_input WITH ''.
+   REPLACE ALL OCCURRENCES OF REGEX '[^\d]' IN x_input WITH SPACE.
    condense x_input NO-GAPS.
    write x_input to campo RIGHT-JUSTIFIED.
    OVERLAY campo WITH '00000000000'.
@@ -186,9 +185,7 @@ ENDMETHOD.
  METHOD desformataNumc14.
    data: x_input type string, campo type c length 14.
    x_input = input.
-   REPLACE ALL OCCURRENCES OF ',' IN x_input WITH ''.
-   REPLACE ALL OCCURRENCES OF '.' IN x_input WITH ''.
-   REPLACE ALL OCCURRENCES OF '-' IN x_input WITH ''.
+   REPLACE ALL OCCURRENCES OF REGEX '[^\d]' IN x_input WITH SPACE.
    condense x_input NO-GAPS.
    write x_input to campo RIGHT-JUSTIFIED.
    OVERLAY campo WITH '00000000000000'.
@@ -263,26 +260,6 @@ ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCLSTRINGUTILS->REMOVESPECIALCHARS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] V_INPUT                        TYPE        STRING
-* | [<-()] V_OUTPUT                       TYPE        STRING
-* +--------------------------------------------------------------------------------------</SIGNATURE>
-  METHOD REMOVESPECIALCHARS.
-    DATA: X_INPUT  TYPE STRING,
-          NO_SPLIT TYPE TABLE OF STRING.
-
-    X_INPUT = V_INPUT.
-    SPLIT X_INPUT AT '-' INTO TABLE NO_SPLIT.
-    READ TABLE NO_SPLIT INDEX 1 INTO V_OUTPUT.
-    IF STRLEN( V_OUTPUT ) < 10.
-      V_OUTPUT = V_INPUT.
-    ENDIF.
-    REPLACE ALL OCCURRENCES OF REGEX '[^A-Za-z0-9\s]' IN V_OUTPUT WITH SPACE.
-  ENDMETHOD.
-
-
-* <SIGNATURE>---------------------------------------------------------------------------------------+
 * | Instance Public Method ZCLSTRINGUTILS->FORMATANUMERAL
 * +-------------------------------------------------------------------------------------------------+
 * | [--->] VALUE                          TYPE        P
@@ -339,6 +316,25 @@ ENDMETHOD.
  METHOD inverteData.
    v_output = v_input+6(2) && v_input+4(2) && v_input+0(4).
  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->JUSTIFY
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] VALUE                          TYPE        STRING
+* | [--->] LARG                           TYPE        I
+* | [<-()] V_OUTPUT                       TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+METHOD justify.
+  data: gap type i.
+  gap = larg - strlen( value ).
+  if gap < 0.
+     gap = 0.
+  endif.
+  data spaces type string.
+  spaces = repeat( val = ` ` occ = gap ).
+  concatenate spaces value into v_output respecting blanks.
+ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
