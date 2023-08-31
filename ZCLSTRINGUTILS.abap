@@ -29,6 +29,11 @@ public section.
       !INPUT type STRING
     returning
       value(V_OUTPUT) type STRING .
+  methods DESFORMATANUMERAL
+    importing
+      !V_INPUT type STRING
+    returning
+      value(V_OUTPUT) type STRING .
   methods FINDTOKEN
     importing
       !VALUE type STRING
@@ -55,6 +60,11 @@ public section.
     importing
       !VALUE type P
       !LARG type I
+    returning
+      value(V_OUTPUT) type STRING .
+  methods FORMATANUMERALTRUNC
+    importing
+      !V_INPUT type P
     returning
       value(V_OUTPUT) type STRING .
   methods INDEXOF
@@ -99,6 +109,11 @@ public section.
       !SCALE type I
     returning
       value(V_OUTPUT) type STRING .
+  methods REMOVEACENTOS
+    importing
+      !V_INPUT type STRING
+    returning
+      value(V_OUTPUT) type STRING .
   methods STRINGLEFT
     importing
       !VALUE type STRING
@@ -127,6 +142,11 @@ public section.
       !V_INPUT type STRING
     returning
       value(V_OUTPUT) type STRING .
+  methods CONV_CSV_PARA_TAB
+    importing
+      !V_INPUT type STRING
+    returning
+      value(V_OUTPUT) type ZTSTRINGS .
 protected section.
 private section.
 ENDCLASS.
@@ -146,6 +166,66 @@ CLASS ZCLSTRINGUTILS IMPLEMENTATION.
 METHOD charCount.
   FIND ALL OCCURRENCES OF CHR IN VALUE MATCH COUNT v_output.
 ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->CONV_CSV_PARA_TAB
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] V_INPUT                        TYPE        STRING
+* | [<-()] V_OUTPUT                       TYPE        ZTSTRINGS
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD conv_csv_para_tab.
+    DATA:
+      lin     TYPE c LENGTH 2048,
+      buf     TYPE string,
+      len     TYPE i, pos TYPE i,
+      chr     TYPE c, quo TYPE c,
+      sep     TYPE c, buf_tam TYPE i.
+
+    lin = v_input.
+    len = strlen( lin ).
+    IF len > 2048.
+      len = 2048.
+    ENDIF.
+
+** identificar qual o separador
+    DO len TIMES.
+      pos = sy-index - 1.
+      chr = lin+pos(1).
+      IF sep IS INITIAL
+        AND ( chr = ';' OR chr = ',' OR chr = '|' OR chr = cl_abap_char_utilities=>horizontal_tab ).
+        sep = chr.
+        EXIT.
+      ENDIF.
+    ENDDO.
+
+** tokenizar a string, ignorando trechos entre parenteses
+    DO len TIMES.
+      pos = sy-index - 1.
+      chr = lin+pos(1).
+      IF chr = '"'.
+        IF quo = abap_true.
+          quo = abap_false.
+        ELSE.
+          quo = abap_true.
+        ENDIF.
+        CONTINUE.
+      ENDIF.
+      IF quo IS INITIAL AND chr = sep OR sy-index = len.
+        IF sy-index = len AND chr <> sep.
+          CONCATENATE buf chr INTO buf RESPECTING BLANKS.
+        ENDIF.
+        APPEND buf TO v_output.
+        CLEAR buf.
+      ELSE.
+        CONCATENATE buf chr INTO buf RESPECTING BLANKS.
+      ENDIF.
+    ENDDO.
+
+    IF buf IS NOT INITIAL.
+      APPEND buf TO v_output.
+    ENDIF.
+  ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
@@ -191,6 +271,45 @@ ENDMETHOD.
    OVERLAY campo WITH '00000000000000'.
    v_output = campo.
  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->DESFORMATANUMERAL
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] V_INPUT                        TYPE        STRING
+* | [<-()] V_OUTPUT                       TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD desformatanumeral.
+    DATA:
+      len          TYPE i,
+      cont         TYPE i,
+      ultimoponto  TYPE i,
+      caractere    TYPE c,
+      numerais     TYPE string,
+      contnumerais TYPE i.
+
+    len = strlen( v_input ).
+    cont = 0.
+    ultimoponto = -1.
+    WHILE cont < len.
+      caractere = v_input+cont(1).
+      IF caractere EQ '.' OR caractere EQ ','.
+        ultimoponto = contnumerais.
+      ELSEIF caractere EQ ' '.
+        " ignorar espacos
+      ELSEIF caractere CO '1234567890'.
+        numerais = numerais && caractere.
+        ADD 1 TO contnumerais.
+      ENDIF.
+      ADD 1 TO cont.
+    ENDWHILE.
+    IF ultimoponto >= 0 AND ultimoponto < contnumerais.
+      cont = contnumerais - ultimoponto.
+      v_output = numerais+0(ultimoponto) && '.' && numerais+ultimoponto(cont).
+    ELSE.
+      v_output = numerais.
+    ENDIF.
+  ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
@@ -289,6 +408,36 @@ METHOD formataNumeralJust.
   endif.
   v_output = saida+off(larg).
 ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->FORMATANUMERALTRUNC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] V_INPUT                        TYPE        P
+* | [<-()] V_OUTPUT                       TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD formatanumeraltrunc.
+    IF v_input = 0.
+      v_output = '0.00'.
+      EXIT.
+    ENDIF.
+
+    DATA valor TYPE p LENGTH 16 DECIMALS 6.
+    IF v_input < 0.
+      valor = v_input * -1.
+    ELSE.
+      valor = v_input.
+    ENDIF.
+
+    DATA: lv_int_char    TYPE string, lv_dec_char(6) TYPE c.
+    lv_int_char = valor DIV 1.
+    lv_dec_char = valor MOD 1.
+    CONDENSE lv_dec_char.
+    OVERLAY lv_dec_char WITH '0.0000'.
+
+    CONCATENATE lv_int_char '.' lv_dec_char+2(2) INTO v_output.
+    CONDENSE v_output NO-GAPS.
+  ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
@@ -419,6 +568,41 @@ ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->REMOVEACENTOS
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] V_INPUT                        TYPE        STRING
+* | [<-()] V_OUTPUT                       TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD removeacentos.
+*Invoca funcao que ira remover os acentos
+    CALL FUNCTION 'SCP_REPLACE_STRANGE_CHARS'
+      EXPORTING
+        intext            = v_input
+*       INTEXT_LG         = 0
+*       INTER_CP          = '0000'
+*       INTER_BASE_CP     = '0000'
+*       IN_CP             = '0000'
+*       REPLACEMENT       = 46
+      IMPORTING
+        outtext           = v_output
+*       OUTUSED           =
+*       OUTOVERFLOW       =
+      EXCEPTIONS
+        invalid_codepage  = 1
+        codepage_mismatch = 2
+        internal_error    = 3
+        cannot_convert    = 4
+        fields_not_type_c = 5
+        OTHERS            = 6.
+
+    IF sy-subrc <> 0.
+      v_output = v_input.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
 * | Instance Public Method ZCLSTRINGUTILS->STRINGLEFT
 * +-------------------------------------------------------------------------------------------------+
 * | [--->] VALUE                          TYPE        STRING
@@ -426,10 +610,14 @@ ENDMETHOD.
 * | [<-()] V_OUTPUT                       TYPE        STRING
 * +--------------------------------------------------------------------------------------</SIGNATURE>
  METHOD stringLeft.
-    data len type i.
+    DATA len TYPE i.
     SEARCH value FOR chars.
-    len = sy-fdpos + strlen( chars ).
-    v_output = value(len).
+    IF sy-fdpos <> 0.
+      len = sy-fdpos.
+      v_output = VALUE(len).
+    ELSE.
+      v_output = value.
+    ENDIF.
  ENDMETHOD.
 
 
@@ -453,29 +641,7 @@ ENDMETHOD.
 * | [<-()] V_OUTPUT                       TYPE        PACKDECIMAL
 * +--------------------------------------------------------------------------------------</SIGNATURE>
  METHOD toPackedDecimal.
-   data: len type i, cont type i, ultimoPonto type i, caractere type c,
-         numerais type string, contNumerais type i.
-   len = strlen( v_input ).
-   cont = 0.
-   ultimoPonto = -1.
-   WHILE cont < len.
-     caractere = v_input+cont(1).
-     if caractere eq '.' or caractere eq ','.
-       ultimoPonto = contNumerais.
-     elseif caractere eq ' '.
-       " ignorar espacos
-     else.
-       numerais = numerais && caractere.
-       add 1 to contNumerais.
-     endif.
-     add 1 to cont.
-   ENDWHILE.
-   if ultimoPonto >= 0 and ultimoPonto < contNumerais.
-      cont = contNumerais - ultimoPonto.
-      v_output = numerais+0(ultimoPonto) && '.' && numerais+ultimoPonto(cont).
-   else.
-      v_output = numerais.
-   endif.
+    v_output = me->desformatanumeral( v_input ).
  ENDMETHOD.
 
 
