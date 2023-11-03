@@ -19,6 +19,11 @@ public section.
       !LEN type I
     returning
       value(V_OUTPUT) type STRING .
+  methods DESFORMATADATA
+    importing
+      !p_in        TYPE string
+    returning
+      VALUE(p_out) TYPE datum .
   methods DESFORMATANUMC11
     importing
       !INPUT type STRING
@@ -39,6 +44,16 @@ public section.
       !VALUE type STRING
       !CHR type C
       !INDEX type I
+    returning
+      value(V_OUTPUT) type STRING .
+  METHODS filtrar_numeros
+    importing
+      !p_in        TYPE string
+      RETURNING
+      VALUE(p_out) TYPE datum .
+  METHODS formatacep
+    importing
+      !VALUE type STRING
     returning
       value(V_OUTPUT) type STRING .
   methods FORMATACNPJ
@@ -176,7 +191,7 @@ ENDMETHOD.
 * +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD conv_csv_para_tab.
     DATA:
-      lin     TYPE c LENGTH 2048,
+      lin     TYPE string,
       buf     TYPE string,
       len     TYPE i, pos TYPE i,
       chr     TYPE c, quo TYPE c,
@@ -184,8 +199,8 @@ ENDMETHOD.
 
     lin = v_input.
     len = strlen( lin ).
-    IF len > 2048.
-      len = 2048.
+    IF len > 102400.
+      len = 102400.
     ENDIF.
 
 ** identificar qual o separador
@@ -237,6 +252,25 @@ ENDMETHOD.
  METHOD criaString.
    v_output = repeat( val = ` ` occ = len ).
  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->DESFORMATADATA
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] P_IN                           TYPE        STRING
+* | [<-()] P_OUT                          TYPE        DATUM
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD desformatadata.
+    DATA lv_txt TYPE c LENGTH 20.
+    lv_txt = p_in.
+    REPLACE ALL OCCURRENCES OF REGEX '[^\d]' IN lv_txt WITH space.
+    CONDENSE lv_txt NO-GAPS.
+    IF strlen( lv_txt ) = 8.
+      p_out = lv_txt+4(4) && lv_txt+2(2) && lv_txt(2).
+    ELSEIF strlen( lv_txt ) = 6.
+      p_out = '20' && lv_txt+4(2) && lv_txt+2(2) && lv_txt(2).
+    ENDIF.
+  ENDMETHOD.
 
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
@@ -297,7 +331,7 @@ ENDMETHOD.
         ultimoponto = contnumerais.
       ELSEIF caractere EQ ' '.
         " ignorar espacos
-      ELSEIF caractere CO '1234567890'.
+      ELSEIF caractere CO '1234567890-'.
         numerais = numerais && caractere.
         ADD 1 TO contnumerais.
       ENDIF.
@@ -349,6 +383,34 @@ METHOD findToken.
   endif.
 ENDMETHOD.
 
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->FILTRAR_NUMEROS
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] P_IN                           TYPE        STRING
+* | [<-()] P_OUT                          TYPE        DATUM
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD filtrar_numeros.
+    DATA lv_txt TYPE c LENGTH 20.
+    lv_txt = p_in.
+    REPLACE ALL OCCURRENCES OF REGEX '[^\d]' IN lv_txt WITH space.
+    CONDENSE lv_txt NO-GAPS.
+    p_out = lv_txt.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method ZCLSTRINGUTILS->FORMATACEP
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] VALUE                          TYPE        STRING
+* | [<-()] V_OUTPUT                       TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD formatacep.
+    DATA campo(8) TYPE c.
+    WRITE value TO campo RIGHT-JUSTIFIED.
+    OVERLAY campo WITH '00000000'.
+    v_output = campo+0(2) && '.' && campo+2(3) && '-' && campo+5(3).
+  ENDMETHOD.
 
 * <SIGNATURE>---------------------------------------------------------------------------------------+
 * | Instance Public Method ZCLSTRINGUTILS->FORMATACNPJ
