@@ -337,6 +337,9 @@ ENDMETHOD.
       ENDIF.
       ADD 1 TO cont.
     ENDWHILE.
+    IF numerais IS INITIAL OR numerais = '-'.
+      EXIT.
+    ENDIF.
     IF ultimoponto >= 0 AND ultimoponto < contnumerais.
       cont = contnumerais - ultimoponto.
       v_output = numerais+0(ultimoponto) && '.' && numerais+ultimoponto(cont).
